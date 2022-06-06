@@ -1,0 +1,37 @@
+{
+  "name": "jpoop/basiccoding",
+  "description": "Learn programming basics like data structures and algorithms and design patterns by php",
+  "type": "project",
+  "minimum-stability": "dev",
+  "keywords": [
+    "php",
+    "data structures",
+    "algorithms",
+    "leetcode",
+    "design patterns"
+  ],
+  "homepage": "https://github.com/jpoop/basiccoding",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "jpeng",
+      "email": "jpeng.work@foxmail.com"
+    }
+  ],
+  "require": {
+    "php": "^7.4",
+    "phpunit/phpunit": "^9.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "algorithms\\": "algorithms",
+      "datastructures\\": "datastructures",
+      "designpatterns\\": "designpatterns",
+      "leetcode\\": "leetcode",
+      "tests\\": "tests"
+    }
+  },
+  "config": {
+    "preferred-install": "dist"
+  }
+}
