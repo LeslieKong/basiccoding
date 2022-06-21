@@ -4,11 +4,11 @@
   "type": "project",
   "minimum-stability": "dev",
   "keywords": [
-    "php",
-    "data structures",
+    "php7",
+    "data-structures",
     "algorithms",
     "leetcode",
-    "design patterns"
+    "design-patterns"
   ],
   "homepage": "https://github.com/jpoop/basiccoding",
   "license": "MIT",
