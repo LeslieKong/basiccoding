@@ -1,5 +1,5 @@
 {
-  "name": "jpoop/basiccoding",
+  "name": "LeslieKong/basiccoding",
   "description": "Learn programming basics like data structures and algorithms and design patterns by php",
   "type": "project",
   "minimum-stability": "dev",
@@ -10,7 +10,7 @@
     "leetcode",
     "design-patterns"
   ],
-  "homepage": "https://github.com/jpoop/basiccoding",
+  "homepage": "https://github.com/LeslieKong/basiccoding",
   "license": "MIT",
   "authors": [
     {
