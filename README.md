@@ -438,7 +438,11 @@ $finance->payOff('张二', 10000);
 
 #### 代码表现
 
-若A聚合B，则B类中包含一个值为A类对象集的成员属性
+若A聚合B，则B类中包含一个值为A类引用的成员属性
+
+聚合和关联在在代码表现上一致，需要从语义上进行分析，关联表示一个类知道另一个类，聚合表示集体与个体之间的关联关系
+
+> 从大话数据结构中看到聚合的例子是大雁和雁群，即雁群中包含一个大雁的对象集成员属性，但是结合网上的一些解释和合成复用原则，我认为应该是从上下文语义上进行区别，比如财务和关联工资单，从语义上不能说是工资单聚合财务吧，他们不是集体与个体的关系，学生聚合班级，从上下文语言上怎么都是学生聚合班级比班级知道（关联）学生更合适
 
 #### UML表示
 
@@ -460,9 +464,9 @@ classDiagram
        +getName()
     }
     class Classes {
-        -array students
-        +setStudents()
-        +getStudents()
+        -Student student
+        +setStudent()
+        +getStudent()
     }
 ```
 
@@ -511,16 +515,16 @@ class Student
 
 class Classes
 {
-    private array $students = [];
+    private Student $student;
 
-    public function setStudents(Student $student)
+    public function setStudent(Student $student)
     {
-        $this->students[] = $student;
+        $this->student = $student;
     }
 
-    public function getStudents(): array
+    public function getStudent(): Student
     {
-        return $this->students;
+        return $this->student;
     }
 }
 
@@ -529,14 +533,9 @@ $classes = new Classes();
 $stu1 = new Student();
 $stu1->setNo(1);
 $stu1->setName('张三');
-$classes->setStudents($stu1);
+$classes->setStudent($stu1);
 
-$stu2 = clone $stu1;
-$stu2->setNo(2);
-$stu2->setName('李四');
-$classes->setStudents($stu2);
-
-var_dump($classes->getStudents());
+var_dump($classes->getStudent());
 ```
 
 ### ④ 合成（Composition）
@@ -1152,7 +1151,7 @@ classDiagram
 
 在项目中，采用里氏替换原则时，尽量避免子类的个性，一旦子类有个性，这个子类和父类之间的关系就很难调和了，把子类当作父类使用，子类的个性被抹杀；把子类单独作为一个业务而不通过父类来使用，则会让代码间的耦合关系变得扑朔迷离（缺乏类替换的标准）
 
-### ④ 依赖倒转
+### ④ 依赖倒置
 
 #### 定义
 
@@ -1164,9 +1163,346 @@ classDiagram
 
 #### 优点
 
+* 减少类间耦合
+* 提高系统稳定性
+* 降低并行开发引起的风险
+* 提高代码的可读性和可维护性
+
 #### 概述
 
+依赖倒置包含3层含义
+
+* 高层模块不应该依赖低层模块，两者都应该依赖其抽象
+* 抽象不应该依赖细节
+* 细节应该依赖抽象
+
+依赖倒置在面向对象设计语言中的表现
+
+* 模块间的依赖通过抽象发生，实现类之间不发生直接的依赖关系，其依赖关系是通过接口或抽象类产生的
+
+* 接口或抽象类不依赖实现类
+
+* 实现类依赖接口或抽象类
+
+  > 依赖倒置的核心是面向接口编程OOD（Object-Oriented Design）,面向对象设计的精髓之一
+
+利用反证法来分析依赖倒置的优点
+
+**不使用依赖倒置也可以松耦合，提高系统稳定性，可维护性和可读性？**
+
+didi派单原来只有C1驾驶员和奔驰车，现在新增C2驾驶员和宝马车
+
+```php
+<?php
+
+declare(strict_types=1);
+
+class Benz
+{
+    public function run()
+    {
+        echo '奔驰开始运行';
+    }
+}
+
+class Bmw
+{
+    public function run()
+    {
+        echo '宝马开始运行';
+    }
+}
+
+class C1Driver
+{
+    public function __construct(string $name)
+    {
+        $output = "司机{$name}
+        驾照C1
+        ";
+
+        echo "<pre>$output</pre>";
+    }
+
+    public function drive(Benz $car)
+    {
+        $car->run();
+    }
+}
+
+class C2Driver
+{
+    public function __construct(string $name)
+    {
+        $output = "司机{$name}
+        驾照C2
+        ";
+
+        echo "<pre>$output</pre>";
+    }
+
+    public function drive(Benz $car)
+    {
+        $car->run();
+    }
+}
+
+class DiDi
+{
+    public function order(C1Driver $driver, Benz $car)
+    {
+        $driver->drive($car);
+    }
+}
+
+$didi = new DiDi();
+
+// didi派C1驾驶员张三开奔驰出单
+$driver = new C1Driver('张三');
+$car = new Benz();
+$didi->order($driver, $car);
+
+// didi派C2驾驶员李四开宝马出单，发现不能正常派单，只能派C1驾驶员，只能派开奔驰
+$driver = new C2Driver('李四');
+$car = new Bmw();
+$didi->order($driver, $car);
+```
+
+上述代码可以看出没有使用依赖倒转倒置司机类，汽车类和DiDi类之间是都是紧耦合，导致系统可维护性降低，可读性降低（奔驰和宝马两个相似的类却需要阅读两个文件），稳定性（固化的，健壮的才是稳定的）降低，仅仅增加了一个C2司机类和宝马车类，却需要修改C1司机类和DiDi类。可以看出上面反论题已经不成立了
+
+> 设计是否具备稳定性，只需要适当地松松土，观察设计的蓝图是否可以茁壮成长就可以得出结论，稳定性较高的设计，在周围环境频繁变化的时候，依然可以做到我自岿然不动
+
+**不使用依赖倒置，也可以降低并行开引起的风险？**
+
+什么是并行开发的风险？并行开发最大的风险就是风险扩散，本来只是一段程序的错误或异常，逐步波及一个功能，一个模块，甚至到最后毁了整个项目。为什么并行开发就有这样的风险呢？一个团队，20个开发人员，个人负责不同的模块，如甲负责汽车类的建造，乙负责司机类的建造，在甲没有完成的情况下，乙是不能完全地编写代码的，更不要说单元测试了，在这种不使用依赖倒置原则的环境中，所有的开发工作都是单线程的，甲做完，乙再做，然后丙再继续，这在小型项目中（一个人完成所有代码）比较适用，但是对于大中型项目已经完全不能胜任了，一个项目是一个团队协作的结果，个人再牛也不能了解所有业务和技术，要协作就要并行开发，要并行开发就要解决模块之间的项目依赖关系，这就需要使用依赖倒置，所以不使用依赖倒置，会增加并行开发引起的风险
+
+**使用依赖倒置对上路案例进行改进**
+
+```php
+<?php
+
+declare(strict_types=1);
+
+interface CarAble
+{
+    public function run();
+}
+
+interface DriverAble
+{
+    public function drive(CarAble $car);
+}
+
+class Benz implements CarAble
+{
+    public function run()
+    {
+        echo '奔驰开始运行<br>';
+    }
+}
+
+class Bmw implements CarAble
+{
+    public function run()
+    {
+        echo '宝马开始运行<br>';
+    }
+}
+
+class C1Driver implements DriverAble
+{
+    public function __construct(string $name)
+    {
+        $output = "司机{$name}
+        驾照C1
+        ";
+
+        echo "<pre>$output</pre>";
+    }
+
+    public function drive(CarAble $car)
+    {
+        $car->run();
+    }
+}
+
+class C2Driver implements DriverAble
+{
+    public function __construct(string $name)
+    {
+        $output = "司机{$name}
+        驾照C2
+        ";
+
+        echo "<pre>$output</pre>";
+    }
+
+    public function drive(CarAble $car)
+    {
+        $car->run();
+    }
+}
+
+class DiDi
+{
+    public function order(DriverAble $driver, CarAble $car)
+    {
+        $driver->drive($car);
+    }
+}
+
+$didi = new DiDi();
+
+// didi派C1驾驶员张三开奔驰出单
+$driver = new C1Driver('张三');
+$car = new Benz();
+$didi->order($driver, $car);
+
+// didi派C2驾驶员李四开宝马出单
+$driver = new C2Driver('李四');
+$car = new Bmw();
+$didi->order($driver, $car);
+```
+
+> 我们再来思考依赖倒置原则对并行开发的影响，两个类之间有依赖关系，只要制定出两者之间的接口（或抽象类）就可以独立开发了，而且项目之间的单元测试也可以独立运行（根据抽象虚拟一个对象），而TDD（Test-Driven Development,测试驱动开发）开发模式就是依赖倒置原则的最高级应用。
+>
+> 两个相互依赖的对象可以分别进行开发，孤立地进行单元测试，进而保证并行开发的效率和质量，TDD开发的精髓不就在这里吗？测试驱动开发，先写好单元测试类，然后再写实现类，这对提高代码质量有非常大的帮助，特别适合研发类项目或项目成员整体水平比较低的情况
+>
+> 抽象是对实现的约束，对依赖着而言，也是一种契约，不仅仅约束自己，还同时约束自己与外部的关系，其目的是保证所有的细节不脱离契约的范畴，确保约束双方按照既定的契约（抽象）共同发展，只要抽象这根基线再，细节就脱离不了这个圈圈，始终让你的对象做到言必行，行必果
+
+**依赖的三种写法**
+
+依赖是可以传递的，A对象依赖B对象，B又依赖C，C又依赖D，生生不息，依赖不知，但是只要做到抽象依赖，即使是多层的依赖传递也无所畏惧
+
+* 构造函数传递依赖对象
+
+  在类中通过构造函数声明依赖对象，按照依赖注入的说法，这种方式叫做构造函数注入
+
+  ```php
+  <?php
+  
+  declare(strict_types=1);
+  
+  interface DriverAble
+  {
+      public function drive();
+  }
+  
+  interface CarAble
+  {
+      public function run();
+  }
+  
+  class C1Driver implements DriverAble
+  {
+      private CarAble $car;
+  
+      public function __construct(CarAble $car)
+      {
+          $this->car = $car;
+      }
+  
+      public function drive()
+      {
+          $this->car->run();
+      }
+  }
+  ```
+
+* Setter方法传递依赖对象
+
+  在抽象中设置Setter方法依赖关系，按照依赖注入的说法，这是Setter注入（常用的方式）
+
+  ```php
+  <?php
+  
+  declare(strict_types=1);
+  
+  interface DriverAble
+  {
+      public function setCar(CarAble $car): void;
+  
+      public function drive();
+  }
+  
+  interface CarAble
+  {
+      public function run();
+  }
+  
+  class C1Driver implements DriverAble
+  {
+      private CarAble $car;
+  
+      public function setCar(CarAble $car): void
+      {
+          $this->car = $car;
+      }
+  
+      public function drive()
+      {
+          $this->car->run();
+      }
+  }
+  ```
+
+* 接口声明依赖注入
+
+  在接口的方法中声明依赖对象，该方法也就接口注入
+
+  ```php
+  <?php
+  
+  declare(strict_types=1);
+  
+  interface DriverAble
+  {
+      public function drive(CarAble $car);
+  }
+  
+  interface CarAble
+  {
+      public function run();
+  }
+  
+  class C1Driver implements DriverAble
+  {
+      public function drive(CarAble $car)
+      {
+          $car->run();
+      }
+  }
+  ```
+
 #### 最佳实践
+
+依赖倒置原则的本质事通过抽象（接口或抽象类）使各个类或模块的实现彼此独立，不互相影响，实现模块间的松耦合，在项目中需要遵循以下几个规则
+
+* 每个类都有接口或抽象类，或者抽象类和接口都具备
+
+  这是依赖倒置的基本要求，接口和抽象类都是抽象的，有了抽象才可能倒置
+
+* 变量的表面类型尽量是接口或者抽象类
+
+  > 定义变量必然有类型，一个变量可以有两种类型，表面类型和实际类型，表面类型是在定义时赋予的类型，实际类型时对象的类型
+
+  很多书上说变量类型一定要是接口或者抽象类，这个有点绝对化了，比如一个工具类，xxxUtils一般是不需要接口或抽象类的。还有Java中要使用类的clone方法，就必须使用实现类（JDK提供的一个规范）
+
+* 任何类都不应该从具体类派生
+
+  如果一个项目处于开发状态，确实不应该有从具体类派生出子类的情况，但这也不是绝对的，因为人都是会犯错误的，有时设计缺陷是在所难免的，因此只要不超过两层的继承都是可以忍受的。特别是负责项目维护的同志，基本上可以不考虑这个规则，为社么？维护工作基本上都是进行扩展开发，修复行为，通过一个继承关系，覆写一个方法就可以修正一个很大的Bug，何必去继承最高的基类呢？（当然这种情况尽量发生在不甚了解父类或者无法获得父类代码的情况下）
+
+* 尽量不要覆写基类的方法
+
+  如果基类是一个抽象类，而且这个方法已经实现了，子类尽量不要覆写。类间的依赖是抽象，覆写了抽象方法，对依赖的稳定性会产生一定的影响
+
+* 结合里氏替换原则使用
+
+  里氏替换原则，父类出现的地方子类就能出现，在结合依赖倒置，我们可以得出一个通俗的规则：接口负责定义public属性和方法，并且声明与其它对象的依赖关系，抽象类负责公共构造部分的实现，实现类准确的实现业务业务逻辑，同时在适当的时候对父类进行细化
+
+依赖倒置的优点在小型项目中很难体现出来，但是在一个大中型项目中，采用依赖倒置则有非常多的优点，特别是规避一些非技术因素引起的问题。项目越大，需求变化的概率也越大，通过采用依赖倒置原则设计的接口或抽象类对实现类进行约束，可以减少需求变化引起的工作量剧增的情况，人员变动在大中型项目中也时常存在的，如果设计优良、代码结构清晰，人员变化对项目的影响成本基本为0。大中型项目的维护周期一般很长，采用依赖倒置原则可以让维护人员轻松的扩展和维护
+
+> 依赖倒置是6个设计原则中最难以实现的原则，它是实现开闭原则的重要途径，依赖倒置原则没有实现，就别想对外开放，对修改关闭。在项目中，大家只要记住：面向接口编程就基本抓住了依赖倒置原则的核心
 
 ### ⑤ 接口隔离
 
@@ -1174,13 +1510,315 @@ classDiagram
 
 **Interface Segregation Principle[ISP]**
 
+**第一种：客户端不应该依赖它不需要的接口**
+
+**第二种：类间的依赖关系应该建立在最小的接口上**
+
+> 接口分为两种
+>
+> 实例接口：声明一个类，然后用new关键字产生一个实例，它是对一个类型的事物的描述，这是一种接口，比如：定义Person类，Person zhangsan = new Person()，zhangsan这个实例要遵从的标准就是Person这个类，Person类就是zhangsan的接口
+>
+> 类接口：使用interface关键字定义的接口
+
+把上面的两个定义概括为一句话：建立单一接口，不要建立臃肿庞大的接口，更通俗一点就是接口尽量细化，同时接口中的方法尽量少。是不是觉得和单一职责有点像？接口隔离原则和单一职责原则的审视角度是不同的，单一职责要求的是类和接口职责单一，注重的是职责，这是业务逻辑上的划分，而接口隔离原则要求接口的方法尽量少，按所需模块划分。例如一个接口的职责可能包含10个方法，这10个方法都在一个接口中，并且提供给多个模块访问，各个模块按照规定的权限来访问，在系统外通过文档约束不使用的方法不要访问，按照单一职责原则是允许的，因为它们功能职责是一样的，按照接口隔离原则是不允许的，因为它要求**尽量使用多个专门的接口**，所需模块不同。专门的接口指的是什么？就是指提供给每个模块的都应该是单一接口，提供给几个模块就应该有几个接口，而不是建立一个庞大臃肿的接口，容纳所有客户端访问
+
+某开源后台管理系统分为正式版和沙箱版，正式版用户可以对数据增删改查，沙箱版用户只能进行创建和读取操作
+
+单一职责
+
+```mermaid
+classDiagram
+	DataOperationAble <|.. Issue
+	DataOperationAble <|.. Sandbox
+	DataOperationAble <.. DataOperationFactory
+
+    class DataOperationAble {
+       +create()
+       +delete()
+       +update()
+       +select()
+    }
+    class Issue {
+       +create()
+       +delete()
+       +update()
+       +select()
+    }
+    class Sandbox {
+       +create()
+       +delete()
+       +update()
+       +select()
+    }
+    class DataOperationFactory {
+       +static getDataOperateion()
+    }
+    
+```
+
+```php
+<?php
+
+declare(strict_types=1);
+
+interface DataOperationAble
+{
+    public function create();
+
+    public function delete();
+
+    public function update();
+
+    public function select();
+}
+
+class Issue implements DataOperationAble
+{
+    public function create()
+    {
+        echo '数据创建中<br>';
+    }
+
+    public function delete()
+    {
+        echo '数据删除中<br>';
+    }
+
+    public function select()
+    {
+        echo '数据读取中<br>';
+    }
+
+    public function update()
+    {
+        echo '数据更新中<br>';
+    }
+}
+
+class Sandbox implements DataOperationAble
+{
+    public function create()
+    {
+        echo '数据创建中<br>';
+    }
+
+    public function delete()
+    {
+        echo '对不起，沙箱版暂不支持删除数据！<br>';
+    }
+
+    public function select()
+    {
+        echo '数据读取中<br>';
+    }
+
+    public function update()
+    {
+        echo '数据更新中<br>';
+    }
+}
+
+class DataOperationFactory
+{
+    public static function getDataOperation(string $env): DataOperationAble
+    {
+        $env = strtolower($env);
+
+        switch ($env) {
+            case 'issue':
+                $dataOperation = new Issue();
+            break;
+            case 'sandbox':
+                $dataOperation = new Sandbox();
+            break;
+            default:
+                throw new InvalidArgumentException('Param is invalid.');
+        }
+
+        return $dataOperation;
+    }
+}
+
+$env = 'sandbox';
+$dataOperation = DataOperationFactory::getDataOperation($env);
+$dataOperation->create();
+$dataOperation->delete();
+$dataOperation->update();
+$dataOperation->select();
+```
+
+接口隔离
+
+```mermaid
+classDiagram
+	DataOperationAble <|-- IssueDataOperationAble
+	DataOperationAble <|-- SandboxDataOperationAble
+	IssueDataOperationAble <.. Issue
+	SandboxDataOperationAble <.. Sandbox
+	DataOperationAble <.. DataOperationFactory
+
+    class DataOperationAble {
+       
+    }
+    class IssueDataOperationAble {
+       +create()
+       +delete()
+       +update()
+       +select()
+    }
+    class SandboxDataOperationAble {
+       +create()
+       +select()
+    }
+    class Issue {
+       +create()
+       +delete()
+       +update()
+       +select()
+    }
+    class Sandbox {
+       +create()
+       +select()
+    }
+    class DataOperationFactory {
+       +static getDataOperateion()
+    }
+    
+```
+
+```php
+<?php
+
+declare(strict_types=1);
+
+//标记接口，标记为数据操作类
+interface DataOperationAble
+{
+
+}
+
+interface IssueDataOperationAble extends DataOperationAble
+{
+    public function create();
+
+    public function delete();
+
+    public function update();
+
+    public function select();
+}
+
+interface SandboxDataOperationAble extends DataOperationAble
+{
+    public function create();
+
+    public function select();
+}
+
+class Issue implements IssueDataOperationAble
+{
+    public function create()
+    {
+        echo '数据创建中<br>';
+    }
+
+    public function delete()
+    {
+        echo '数据删除中<br>';
+    }
+
+    public function select()
+    {
+        echo '数据读取中<br>';
+    }
+
+    public function update()
+    {
+        echo '数据更新中<br>';
+    }
+}
+
+class Sandbox implements SandboxDataOperationAble
+{
+    public function create()
+    {
+        echo '数据创建中<br>';
+    }
+
+    public function select()
+    {
+        echo '数据读取中<br>';
+    }
+
+    public function __call($name, $arguments)
+    {
+        echo "对不起，沙箱版暂不支持{$name}<br>";
+    }
+}
+
+class DataOperationFactory
+{
+    public static function getDataOperation(string $env): DataOperationAble
+    {
+        $env = strtolower($env);
+
+        switch ($env) {
+            case 'issue':
+                $dataOperation = new Issue();
+            break;
+            case 'sandbox':
+                $dataOperation = new Sandbox();
+            break;
+            default:
+                throw new InvalidArgumentException('Param is invalid.');
+        }
+
+        return $dataOperation;
+    }
+}
+
+$env = 'sandbox';
+$dataOperation = DataOperationFactory::getDataOperation($env);
+$dataOperation->create();
+$dataOperation->delete();
+$dataOperation->update();
+$dataOperation->select();
+```
+
 #### 案例
+
+上面接口隔离案例
 
 #### 优点
 
 #### 概述
 
+接口隔离原则是对接口进行规范约束，其包含以下4层含义：
+
+* 接口要尽量小
+
+  这是接口隔离的核心定义，不出现臃肿的接口，但是小是有限度的，首先就是不能违背单一职责原则。比如上面单一职责案例，本来职责是数据操作，因为不同的环境（正式版和沙箱版）数据操作不一样，我们就去把单一的数据操作职责拆分成数据添加职责，数据删除职责，数据修改职责，数据查询职责4个职责？从业务上将，数据操作已经是最小的业务单位了，再细分下去就是对业务的拆分了。从业务层次来看，这样的设计是失败的，接口隔离要我们拆分，单一职责又不让拆，听谁的？答案是：**根据接口隔离原则拆分接口时，首先必须满足单一职责原则**
+
+* 接口要高内聚
+
+  什么是高内聚？高内聚就是提高接口、类、模块的处理能力，减少对外的交互。具体到接口隔离原则就是：要求接口中尽量少公布public方法，接口是对外的承诺，承诺越少对系统的开发越有利，变更的风险也就越少，同时也利于较低成本
+
+* 定制服务
+
+  一个系统或系统内的模块之间必然有耦合，会有耦合就要有互相访问的接口（并不一定是Interface，也可能是一个类或单纯的数据交换），我们在设计时就需要为各个访问者（即客户端）定制服务，什么是定制服务？就是单独为一个个体提高优良的服务（只提供访问者需要的方法）
+
+* 接口设计是有限度的
+
+  接口的设计粒度越小，系统越灵活，这是不争的事实。但是，灵活的同时也带来了结构的复杂化，开发难度增加，可维护性降低，所以接口设计一定要适度，这个度就需要根据经验和常识判断了，没有一个固化或可测量的标准
+
 #### 最佳实践
+
+接口隔离原则是对接口的定义，同时也是对类的定义，接口和类尽量使用原子接口或原子类来组装，但是这个原子该怎么划分是设计模式中的一大难题，在实践中可根据以下几个规则来衡量：
+
+* 一个接口只服务于一个子模块或业务逻辑
+* 通过业务逻辑压缩接口中的public方法，接口时常去回顾，尽量让接口达到满身筋骨肉，而不是肥嘟嘟的一大堆方法
+* 已经被污染了的接口，尽量去修改，若变更的风险比较大，则采用适配器模式进行转化处理
+* 了解环境，拒绝盲从。每个项目或产品都有特定的环境因素，别看大师是这样做的就找抄。千万别，环境不同，接口拆分的标准就不同。深入了解业务逻辑，最好的接口设计就出自你的手中
 
 ### ⑥ 迪米特
 
@@ -1188,13 +1826,398 @@ classDiagram
 
 **Demeter Principle[DP]**
 
+**迪米特法则也称为最少知识原则，一个对象应该对其它对象有最少的了解**
+
+> 迪米特原则通俗的讲：一个类应该对自己需要耦合或调用的类知道得最少，你（被耦合或调用的类）的内部是如何复杂都和我没关系，那是你的事情，我就知道你提供的这么多public方法，我就调用这么多，其他的我一概不关心
+
 #### 案例
 
 #### 优点
 
+* 类间解耦
+* 提高系统灵活性，可维护性和稳定性
+
 #### 概述
 
+迪米特法则对类的低耦合提出了明确的要求，其包含以下4层含义：
+
+* 只和朋友交流
+
+  迪米特法则还有一个英文解释是：Only talk to your immediate friends（只与直接的朋友通信）。什么叫做直接的朋友呢？每个对象都必然会与其它对象有耦合的关系，两个对象之间的耦合就会成为朋友关系，这种关系的类型有很多：依赖，关联，聚合，合成，泛化
+
+  什么叫做与朋友直接交流？案例：腾讯网友口中的口口相传（行政部通过WXG告诉CSIG你们部门要裁50%）
+
+  ```mermaid
+  classDiagram
+  	Administration ..> Wxg
+  	Administration ..> Csig
+  	Wxg ..> Csig
+  
+      class Administration {
+         +notify(Wxg wxg, string $message)
+      }
+      class Wxg {
+         +turn(Csig csig, string message)
+      }
+      class Csig {
+         -static message
+         +setMessage()
+         +getMessage()
+      }
+  ```
+
+  
+
+  ```php
+  <?php
+  
+  declare(strict_types=1);
+  
+  class Csig
+  {
+      private static string $message;
+  
+      public function getMessage()
+      {
+          echo static::$message;
+      }
+  
+      /**
+       * @param string $message
+       */
+      public function setMessage(string $message): void
+      {
+          static::$message = $message;
+      }
+  }
+  
+  class Wxg
+  {
+      public function turn(Csig $csig, string $message)
+      {
+          $message = '你们部门要裁80%，快run！';
+          $csig->setMessage($message);
+      }
+  }
+  
+  class Administration
+  {
+      public function notify(Wxg $wxg, string $message)
+      {
+          $csig = new Csig();
+          $wxg->turn($csig, $message);
+      }
+  }
+  
+  $administration = new Administration();
+  $wxg = new Wxg();
+  $administration->notify($wxg, 'Csig部门要裁50%，让他们准备一下吧！');
+  $csig = new Csig();
+  $csig->getMessage();
+  ```
+
+  上面的代码有什么问题呢？Administration类有几个朋友类？它仅有一个朋友类--Wxg，虽然Administration对Csig产生了依赖，但他不是。
+
+  > 朋友类的定义：出现在成员变量，方法的输入输出参数中的类称为成员朋友类，而出现在方法体内部的类不属于朋友类
+
+  迪米特法则告诉我们只和朋友类交流，Administration类却和陌生类Csig有了交流，这样会破坏Administration的健壮性。方法是一个类的行为，类竟然不知道自己的行为与其他类产生依赖关系，这是不允许的，严重违反了迪米特法则。
+
+  纵观现实，我们已经明确了Administration只需要发布通知给Wxg，然后由他们转发给Csig，那我根本不需要知道Csig
+
+  对上述案例按照迪米特做出修改
+
+  
+
+  ```mermaid
+  classDiagram
+  	Administration ..> Wxg
+  	Wxg --> Csig
+  
+      class Administration {
+         +notify(Wxg wxg, string $message)
+      }
+      class Wxg {
+         -Csig csig
+         +turn(string message)
+      }
+      class Csig {
+         -static message
+         +setMessage()
+         +getMessage()
+      }
+  ```
+
+  
+
+  ```php
+  <?php
+  
+  declare(strict_types=1);
+  
+  class Csig
+  {
+      private static string $message;
+  
+      public function getMessage()
+      {
+          echo static::$message;
+      }
+  
+      /**
+       * @param string $message
+       */
+      public function setMessage(string $message): void
+      {
+          static::$message = $message;
+      }
+  }
+  
+  class Wxg
+  {
+      private Csig $csig;
+  
+      public function turn(string $message)
+      {
+          $message = '你们部门要裁80%，快run！';
+          $this->csig = new Csig();
+          $this->csig->setMessage($message);
+      }
+  }
+  
+  class Administration
+  {
+      public function notify(Wxg $wxg, string $message)
+      {
+          $wxg->turn($message);
+      }
+  }
+  
+  $administration = new Administration();
+  $wxg = new Wxg();
+  $administration->notify($wxg, 'Csig部门要裁50%，让他们准备一下吧！');
+  $csig = new Csig();
+  $csig->getMessage();
+  ```
+
+  对程序做出了修改，避开了Administration对Csig的访问，降低了系统间的耦合，提高了系统的健壮性
+
+  >一个类只和朋友交流，不与陌生类交流，不要出现getA().getB().getC().getD()这种情况（在一种极端的情况下允许出现这种访问，即每一个.号后面的返回类型都相同），类与类之间的关系是建立在类间的，而不是方法间，因此一个方法尽量不引入一个类中不存在的对象（语言提供的类除外）
+
+* 朋友之间也是有距离的
+
+  距离产生美，即使是朋友类之间也不能无话不说，无所不知
+
+  案例：我们在安装软件的时候，经常会有一个导向动作，第一步是确认是否安装，第二步是确认License是否安全，再然后是一些自定义设置等，这是一个典型的顺序执行动作，具体到程序就是：调用一个或多个类，先执行第一个方法，然后是第二个方法，根据返回结果再来看是否可以调用第三个方法，或者第四个方法，等等
+
+  案例：安装某软件执行3步且都成功之后安装成功，否则安装失败
+
+  ```mermaid
+  classDiagram
+  	InstallSoftware ..> Wizard
+  
+      class InstallSoftware {
+         +installWizard(Wizard wizard)
+      }
+      class Wizard {
+         +first()
+         +second()
+         +third()
+         +fail()
+         +success()
+      }
+  ```
+
+  ```php
+  <?php
+  
+  declare(strict_types=1);
+  
+  class Wizard
+  {
+      public function __construct()
+      {
+          echo '安装开始-------------------------------------<br>';
+      }
+  
+      public function first(): int
+      {
+          $result = rand(0, 1);
+          $message = $result ? '成功' : '失败';
+          echo "执行第一个方法{$message}<br>";
+  
+          return $result;
+      }
+  
+      public function second(): int
+      {
+          $result = rand(0, 1);
+          $message = $result ? '成功' : '失败';
+          echo "执行第二个方法{$message}<br>";
+  
+          return $result;
+      }
+  
+      public function third(): int
+      {
+          $result = rand(0, 1);
+          $message = $result ? '成功' : '失败';
+          echo "执行第三个方法{$message}<br>";
+  
+          return $result;
+      }
+  
+      public function fail()
+      {
+          echo '安装失败-------------------------------------<br>';
+      }
+  
+      public function success()
+      {
+          echo '安装成功-------------------------------------<br>';
+      }
+  }
+  
+  class InstallSoftware
+  {
+      public function installWizard(Wizard $wizard)
+      {
+          if ($wizard->first() === 1) {
+              if ($wizard->second() === 1) {
+                  if ($wizard->third() === 1) {
+                      $wizard->success();
+                  } else {
+                      $wizard->fail();
+                  }
+              } else {
+                  $wizard->fail();
+              }
+          } else {
+              $wizard->fail();
+          }
+      }
+  }
+  
+  $installSoftware = new InstallSoftware();
+  $wizard = new Wizard();
+  $installSoftware->installWizard($wizard);
+  ```
+
+  代码上线后，review代码的时候发现代码不规范，三个步骤代表的是用户是否进行下一步，应该返回布尔类型，那就改吧？改了Wizard，还需要修改InstallSoftware。造成这种情况是因为Wizard类把太多的方法暴漏给InstallSoftware类，两者的朋友关系太亲密了，耦合关系变得异常牢固。当修改Wizard类时，就必须修改InstallSoftware类，从而把修改变更的风险扩散开了。这样的耦合时极度不合适的，因此需要对系统进行重构
+
+  ```mermaid
+  classDiagram
+  	InstallSoftware ..> Wizard
+  
+      class InstallSoftware {
+         +installWizard(Wizard wizard)
+      }
+      class Wizard {
+         +first()
+         +second()
+         +third()
+         +fail()
+         +success()
+         +installWizard()
+      }
+  ```
+
+  ```php
+  <?php
+  
+  declare(strict_types=1);
+  
+  class Wizard
+  {
+      public function __construct()
+      {
+          echo '安装开始-------------------------------------<br>';
+      }
+  
+      private function first(): bool
+      {
+          $result = (bool)rand(0, 1);
+          $message = $result ? '成功' : '失败';
+          echo "执行第一个方法{$message}<br>";
+  
+          return $result;
+      }
+  
+      private function second(): bool
+      {
+          $result = (bool)rand(0, 1);
+          $message = $result ? '成功' : '失败';
+          echo "执行第二个方法{$message}<br>";
+  
+          return $result;
+      }
+  
+      private function third(): bool
+      {
+          $result = (bool)rand(0, 1);
+          $message = $result ? '成功' : '失败';
+          echo "执行第三个方法{$message}<br>";
+  
+          return $result;
+      }
+  
+      private function fail()
+      {
+          echo '安装失败-------------------------------------<br>';
+      }
+  
+      private function success()
+      {
+          echo '安装成功-------------------------------------<br>';
+      }
+  
+      public function installWizard()
+      {
+          if ($this->first()) {
+              if ($this->second()) {
+                  if ($this->third()) {
+                      $this->success();
+                  } else {
+                      $this->fail();
+                  }
+              } else {
+                  $this->fail();
+              }
+          } else {
+              $this->fail();
+          }
+      }
+  }
+  
+  class InstallSoftware
+  {
+      public function installWizard(Wizard $wizard)
+      {
+          $wizard->installWizard();
+      }
+  }
+  
+  $installSoftware = new InstallSoftware();
+  $wizard = new Wizard();
+  $installSoftware->installWizard($wizard);
+  ```
+
+  通过重构后，类间的耦合关系变弱了，结构也清晰了，变更引起的风险也变小了
+
+  一个类公开的public属性或方法越多，修改时涉及的面也就越大，变更引起的风险扩散也就越大。因此，为了保持朋友类间的距离，在设计时需要反复衡量：是否还可以再减少public方法和属性，是否可以修改为private，Java package-private（包类型，在类、方法、变量前不加访问权限，则默认为包类型），protected等访问权限，是否可以加上final关键字等
+
+  > 迪米特法则要求类羞涩一点，尽量不要对外公布太多的public方法和非静态的public变量，尽量内敛，多使用private、Java package-private、protected等访问权限
+
+* 是自己的就是自己的
+
+  在实际应用中经常会出现这样一个方法：放在本来中也可以，放在其它类中也没有错，那怎么去衡量呢？你可以检查这样一个原则：**如果一个方法放在本类中，既不增加类间关系，也对本类不产生负面影响，那就放在本类中**
+
 #### 最佳实践
+
+迪米特法则的核心观念就是类间解耦，弱耦合，只有弱耦合了以后，类的复用率才可以提高。其要求的结果就是产生了大量的中转或跳转类，导致系统的复杂性提高，同时也为维护带来了困难。所以在采用迪米特法则的时候需要反复权衡，既做到让结构清晰，又做到高内聚低耦合。
+
+根据著名的六度分隔理论（任何两个素不相识的人中间最多只隔着6个人），调用者类和被调用者类之间最多有六次传递？在实际应用中，如果一个类跳转两次以上才能访问到另一个类，就需要想办法进行重构了，为什么是两次以上呢？因为一个系统的成功不仅仅是一个标准或是原则就能够决定的，有非常多的外在因素决定，跳转次数越多，系统越复杂，维护就越困难，所以只要不超过两次都是可以忍受的，这需要具体问题具体分析
+
+迪米特法则要求类间解耦，但解耦是有限度的，除非是计算机的最小单元（二进制的0和1）那才是完全解耦，在实际项目中，需要适度考虑这个原则，别为了套用原则而做项目。原则只是供参考，违背了这个原则，项目也未必会失败，这就需要大家在采用原则的时候反复度量，不遵循是不对的，严格执行是过犹不及
 
 ### ⑦ 合成复用
 
@@ -1202,13 +2225,76 @@ classDiagram
 
 **Composite Reuse Principle[CRP]**
 
+**在软件复用时，尽量使用组合或聚合等关联关系来实现，其次再考虑继承**
+
+> 如果使用继承，必须严格遵循里氏替换原则，合成复用原则和里氏替换原则是相辅相成的，两者都是开闭原则的实现规范
+
 #### 案例
+
+某软件公司DB采用的是MySQL，DBUtil里面封装了数据库连接方法，模型为了复用数据库连接方法，使用了继承
+
+```mermaid
+classDiagram
+	DBUtil <|-- Model
+	
+    class DBUtil {
+       +getConnection()
+    }
+    class Model {
+       +select()
+    }
+    
+```
+
+现在需要将MySQL替换为Oracle,需要修改DBUtil的连接代码，或者在Model重写连接代码，都违背了开闭原则，所以需要进行改进
+
+```mermaid
+classDiagram
+	DBUtil <|.. MySQLUtil
+	DBUtil <|.. OracleUtil
+	DBUtil <-- Model
+	
+    class DBUtil {
+       +getConnection()
+    }
+    class MySQLUtil {
+       +getConnection()
+    }
+    class OracleUtil {
+       +getConnection()
+    }
+    class Model {
+       -DBUtil util
+       +select()
+    }
+    
+```
+
+经过改进之后，Model可以复用DBUtil的代码，只需要在运行时指定具体的DBUtil实现类即可，提高了系统灵活性和稳定性
 
 #### 优点
 
+* 保证了类的封装性
+* 降低类间耦合
+* 提高系统灵活性和稳定性
+
 #### 概述
 
+通常类的复用分为继承复用和合成复用两种，继承复用虽然有简单和易实现的优点，但它也存在以下缺点
+
+* 继承破坏类的封装性。因为继承会将父类的实现细节暴漏给子类，父类对子类是透明的，所以这种复用又被称为白箱复用
+* 子类与父类耦合度高。父类的的实现有任何变更都会波及子类，不利于扩展和维护
+* 限制了复用的灵活性。从父类继承而来的实现是静态的，在编译时已经定义，所以在运行时不可能发生变化
+
+采用组合或聚合复用时，可以将已有对象纳入到新的对象中，使之称为新对象的一部分，新对象可以调用已有对象的功能，有以下优点
+
+* 维持了类的封装性。因为成分性对象的内部细节是新对象看不见的，所以这种复用又称为黑箱复用
+* 新旧类之间的耦合度降低。这种复用所需的依赖较少，新对象存取成分对象的唯一方法是通过成分对象的接口
+* 复用的灵活性提高。这种复用可以在运行时动态进行，新对象可以动态地引用与成分对象类型相同的对象
+
 #### 最佳实践
+
+虽然里氏替换原则对良好的继承定义了规范，但是继承毕竟是类间耦合最高的，耦合过高不利于系统的稳定和扩展，因此我们应该尽量考虑是否可以通过耦合较低的组合，组合，关联来替代继承（泛化），最终实现代码复用的目的
 
 ## 3.4 设计模式分类
 
@@ -1290,11 +2376,11 @@ classDiagram
 
 
 
-# 八、MySQL
+# 八、关系型数据库
 
 
 
-# 九、NoSQL
+# 九、非关系型数据库
 
 
 
@@ -1302,7 +2388,7 @@ classDiagram
 
 
 
-#  十一、Nginx
+#  十一、服务器
 
 
 
@@ -1310,11 +2396,11 @@ classDiagram
 
 
 
-# 十三、ES
+# 十三、搜索引擎
 
 
 
-# 十四、Docker
+# 十四、容器技术
 
 
 
